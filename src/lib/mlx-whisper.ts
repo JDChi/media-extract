@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
 
@@ -29,13 +29,43 @@ function huggingFaceCacheRoots(): string[] {
   return [...new Set(roots)];
 }
 
+function hasCompletedModelCache(location: string): boolean {
+  if (!existsSync(location)) {
+    return false;
+  }
+
+  const refsMain = join(location, "refs", "main");
+  const snapshotsDir = join(location, "snapshots");
+  const blobsDir = join(location, "blobs");
+
+  if (!existsSync(refsMain) || !existsSync(snapshotsDir) || !existsSync(blobsDir)) {
+    return false;
+  }
+
+  const snapshotEntries = readdirSync(snapshotsDir);
+  if (snapshotEntries.length === 0) {
+    return false;
+  }
+
+  const blobEntries = readdirSync(blobsDir);
+  if (blobEntries.length === 0) {
+    return false;
+  }
+
+  if (blobEntries.some((entry: string) => entry.endsWith(".incomplete"))) {
+    return false;
+  }
+
+  return true;
+}
+
 export function detectMediumModel(): { status: "ok" | "missing"; locations: string[] } {
   const locations = huggingFaceCacheRoots().map((root) =>
     join(root, "hub", "models--mlx-community--whisper-medium-mlx")
   );
 
   return {
-    status: locations.some((location) => existsSync(location)) ? "ok" : "missing",
+    status: locations.some((location) => hasCompletedModelCache(location)) ? "ok" : "missing",
     locations
   };
 }
