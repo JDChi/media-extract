@@ -51,8 +51,9 @@ test("top-level help is human-readable", () => {
     encoding: "utf8"
   });
 
-  assert.match(output, /usage:\s+media-extract/i);
-  assert.match(output, /doctor/i);
+  assert.match(output, /Usage:/i);
+  assert.match(output, /media-extract <command> \[options\]/i);
+  assert.match(output, /doctor\s+Check local dependencies/i);
   assert.match(output, /extract-audio/i);
   assert.doesNotMatch(output, /^\s*\{/m);
 });
@@ -63,7 +64,8 @@ test("subcommand help is human-readable", () => {
     encoding: "utf8"
   });
 
-  assert.match(output, /usage:\s+media-extract transcribe/i);
-  assert.match(output, /--format txt\|srt/i);
+  assert.match(output, /Usage:/i);
+  assert.match(output, /media-extract transcribe <inputPath>/i);
+  assert.match(output, /--format <format>/i);
   assert.doesNotMatch(output, /^\s*\{/m);
 });
