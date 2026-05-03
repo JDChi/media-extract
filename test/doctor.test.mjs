@@ -36,7 +36,7 @@ test("doctor reports a usable extraction environment with internally consistent 
   );
 });
 
-test("detectMediumModel stays missing while the Hugging Face cache still contains an incomplete blob", () => {
+test("detectMediumModel stays missing until the main snapshot contains required model files", () => {
   const hfHome = makeTempDir("hf-home-");
   const modelRoot = join(
     hfHome,
@@ -45,10 +45,8 @@ test("detectMediumModel stays missing while the Hugging Face cache still contain
   );
   mkdirSync(join(modelRoot, "refs"), { recursive: true });
   mkdirSync(join(modelRoot, "snapshots", "snapshot-1"), { recursive: true });
-  mkdirSync(join(modelRoot, "blobs"), { recursive: true });
   writeFileSync(join(modelRoot, "refs", "main"), "snapshot-1");
-  writeFileSync(join(modelRoot, "blobs", "weights.bin.incomplete"), "partial");
-  writeFileSync(join(modelRoot, "blobs", "tokenizer.json"), "ready");
+  writeFileSync(join(modelRoot, "snapshots", "snapshot-1", "config.json"), "{}");
 
   const previousHfHome = process.env.HF_HOME;
   const previousHome = process.env.HOME;
@@ -61,6 +59,52 @@ test("detectMediumModel stays missing while the Hugging Face cache still contain
   try {
     const result = detectMediumModel();
     assert.equal(result.status, "missing");
+    assert.equal(result.locations.some((location) => location === modelRoot), true);
+  } finally {
+    if (previousHfHome === undefined) {
+      delete process.env.HF_HOME;
+    } else {
+      process.env.HF_HOME = previousHfHome;
+    }
+
+    if (previousHome === undefined) {
+      delete process.env.HOME;
+    } else {
+      process.env.HOME = previousHome;
+    }
+
+    if (previousXdgCacheHome === undefined) {
+      delete process.env.XDG_CACHE_HOME;
+    } else {
+      process.env.XDG_CACHE_HOME = previousXdgCacheHome;
+    }
+  }
+});
+
+test("detectMediumModel reports ok when the main snapshot contains required model files", () => {
+  const hfHome = makeTempDir("hf-home-");
+  const modelRoot = join(
+    hfHome,
+    "hub",
+    "models--mlx-community--whisper-medium-mlx"
+  );
+  mkdirSync(join(modelRoot, "refs"), { recursive: true });
+  mkdirSync(join(modelRoot, "snapshots", "snapshot-1"), { recursive: true });
+  writeFileSync(join(modelRoot, "refs", "main"), "snapshot-1");
+  writeFileSync(join(modelRoot, "snapshots", "snapshot-1", "config.json"), "{}");
+  writeFileSync(join(modelRoot, "snapshots", "snapshot-1", "weights.npz"), "weights");
+
+  const previousHfHome = process.env.HF_HOME;
+  const previousHome = process.env.HOME;
+  const previousXdgCacheHome = process.env.XDG_CACHE_HOME;
+  const isolatedHome = makeTempDir("home-");
+
+  process.env.HF_HOME = hfHome;
+  process.env.HOME = isolatedHome;
+  delete process.env.XDG_CACHE_HOME;
+  try {
+    const result = detectMediumModel();
+    assert.equal(result.status, "ok");
     assert.equal(result.locations.some((location) => location === modelRoot), true);
   } finally {
     if (previousHfHome === undefined) {

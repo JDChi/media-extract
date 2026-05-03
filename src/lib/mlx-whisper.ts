@@ -1,4 +1,4 @@
-import { existsSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, extname, join, resolve } from "node:path";
 
@@ -7,6 +7,7 @@ import { findExecutable, runCommand } from "./shell.js";
 
 export const DEFAULT_MODEL_LABEL = "medium";
 export const DEFAULT_MODEL_REPO = "mlx-community/whisper-medium-mlx";
+const REQUIRED_MODEL_FILES = ["config.json", "weights.npz"] as const;
 
 export type TranscriptFormat = "txt" | "srt";
 
@@ -35,28 +36,21 @@ function hasCompletedModelCache(location: string): boolean {
   }
 
   const refsMain = join(location, "refs", "main");
-  const snapshotsDir = join(location, "snapshots");
-  const blobsDir = join(location, "blobs");
-
-  if (!existsSync(refsMain) || !existsSync(snapshotsDir) || !existsSync(blobsDir)) {
+  if (!existsSync(refsMain)) {
     return false;
   }
 
-  const snapshotEntries = readdirSync(snapshotsDir);
-  if (snapshotEntries.length === 0) {
+  const snapshotRef = readFileSync(refsMain, "utf8").trim();
+  if (snapshotRef.length === 0) {
     return false;
   }
 
-  const blobEntries = readdirSync(blobsDir);
-  if (blobEntries.length === 0) {
+  const snapshotDir = join(location, "snapshots", snapshotRef);
+  if (!existsSync(snapshotDir)) {
     return false;
   }
 
-  if (blobEntries.some((entry: string) => entry.endsWith(".incomplete"))) {
-    return false;
-  }
-
-  return true;
+  return REQUIRED_MODEL_FILES.every((file) => existsSync(join(snapshotDir, file)));
 }
 
 export function detectMediumModel(): { status: "ok" | "missing"; locations: string[] } {
